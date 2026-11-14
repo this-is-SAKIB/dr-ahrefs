@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ahrefs Domain Rating Checker</title>
+  <style>
+    :root { --blue:#8ab4f8; --ink:#e8eaed; --muted:#a9b0bb; --line:#4b5563; --soft:#20252c; --bg:#11151a; --card:#1b2027; --input:#151a20; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.45 Arial,sans-serif; }
+    main { max-width:1100px; margin:24px auto; padding:0 16px 36px; }
+    .card { background:var(--card); border-radius:10px; box-shadow:0 1px 3px #0008; padding:20px; margin-bottom:16px; }
+    h1 { font-size:24px; margin:0 0 4px; }
+    h2 { font-size:17px; margin:0 0 12px; }
+    .sub { color:var(--muted); margin:0 0 18px; }
+    textarea { width:100%; min-height:180px; resize:vertical; border:1px solid var(--line); border-radius:6px; padding:11px; font:13px/1.5 Consolas,monospace; background:var(--input); color:var(--ink); }
+    input[type=password], select { border:1px solid var(--line); border-radius:5px; padding:9px; width:100%; background:var(--input); color:var(--ink); }
+    label { display:block; font-weight:600; margin:12px 0 5px; }
+    .row { display:grid; grid-template-columns:1fr 180px; gap:14px; align-items:end; }
+    button { border:1px solid var(--line); background:var(--soft); color:var(--ink); border-radius:5px; padding:10px 14px; cursor:pointer; font-weight:600; }
+    button.primary { background:var(--blue); border-color:var(--blue); color:white; }
+    button:disabled { opacity:.55; cursor:wait; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+    .notice { background:#3b3018; border-left:4px solid #f9ab00; padding:10px 12px; margin-top:14px; }
+    .status { color:var(--muted); min-height:22px; margin-top:12px; }
+    .table-wrap { overflow:auto; max-height:520px; border:1px solid var(--line); }
+    table { width:100%; border-collapse:collapse; min-width:520px; }
+    th,td { border-bottom:1px solid var(--line); padding:8px 10px; text-align:left; white-space:nowrap; }
+    th { background:var(--soft); position:sticky; top:0; }
+    .empty { color:var(--muted); padding:24px; text-align:center; }
+    a { color:var(--blue); }
+    .topline { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+    .top-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .small-button { padding:7px 10px; font-size:12px; }
+    .column-controls { display:none; border:1px solid var(--line); border-radius:6px; padding:10px; margin:0 0 12px; }
+    .column-controls.open { display:block; }
+    .column-controls label { display:inline-flex; align-items:center; gap:5px; font-weight:normal; margin:4px 12px 4px 0; }
+    .column-controls .control-actions { margin-top:7px; display:flex; gap:7px; }
+    body.light { --ink:#202124; --muted:#5f6368; --line:#dadce0; --soft:#f8f9fa; --bg:#f1f3f4; --card:#ffffff; --input:#ffffff; }
+    body.light .notice { background:#fff8e1; }
+    @media (max-width:700px) { .row { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <section class="card">
+    <div class="topline">
+      <div>
+        <h1>Ahrefs Domain Rating Checker</h1>
+        <p class="sub">Paste domains or URLs in bulk, check DR, and download a table-shaped CSV.</p>
+      </div>
+      <div class="top-actions"><button class="small-button" id="themeToggle">Switch to light mode</button></div>
+    </div>
+    <label id="keyLabel" for="key">Ahrefs APIv3 key</label>
+    <input id="key" type="password" autocomplete="off" placeholder="Used only in this browser session; never saved">
+    <div class="row">
+      <div>
+        <label for="version">Domain Rating version</label>
+        <select id="version"><option value="dr3" selected>dr3</option><option value="dr4">dr4</option></select>
+      </div>
+      <div>
+        <label for="file">Or load a file</label>
+        <input id="file" type="file" accept=".txt,.csv,.tsv">
+      </div>
+    </div>
+    <label for="targets">Targets — one domain or URL per line</label>
+    <textarea id="targets" placeholder="example.com&#10;https://example.org/page&#10;subdomain.example.net"></textarea>
+    <div class="actions">
+      <button class="primary" id="run">Check DR</button>
+      <button id="download" disabled>Download CSV</button>
+      <button id="clear">Clear</button>
+    </div>
+    <div class="status" id="status">Ready.</div>
+    <div class="notice"><b>Privacy and hosting:</b> the key is kept only in this page’s memory and is not written to local storage. Do not publish a shared key in a public website. For reliable browser use, run <code>python run_local.py</code> and open the localhost URL it prints; this uses a local proxy to avoid CORS.</div>
+  </section>
+
+  <section class="card">
+    <div class="topline">
+      <h2>Results</h2>
+      <button class="small-button" id="columnToggle">Show / hide columns</button>
+    </div>
+    <div class="column-controls" id="columnControls">
+      <div id="columnChecks"></div>
+      <div class="control-actions">
+        <button class="small-button" id="showDefault">Default columns</button>
+        <button class="small-button" id="showAll">Show all</button>
+      </div>
+    </div>
+    <div class="table-wrap" id="table"><div class="empty">No results yet.</div></div>
+    <p><small>Attribution: <a href="https://ahrefs.com/" target="_blank" rel="noopener">Domain Rating by Ahrefs</a></small></p>
+  </section>
+
+  <section class="card">
+    <h2>Usage notes</h2>
+    <p>This page uses Ahrefs’ documented free Domain Rating endpoint. It sends at most 1,000 unique targets per request and retries temporary HTTP 429 responses. For browser use, start <code>run_local.py</code>; for large lists, use <code>ahrefs_dr.py</code>.</p>
+    <p><a href="https://docs.ahrefs.com/en/api/reference/public/post-domain-rating-free" target="_blank" rel="noopener">Ahrefs endpoint documentation</a> · <a href="https://ahrefs.com/legal/domain-rating-license" target="_blank" rel="noopener">Domain Rating license</a></p>
+  </section>
+</main>
+<script>
+  const ENDPOINT = 'https://api.ahrefs.com/v3/public/domain-rating-free?output=json';
+  const LOCAL_PROXY = location.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(location.hostname);
+  const MAX_TARGETS = 1000;
+  const RETRY_DELAYS = [5000, 15000, 30000];
+  const ALL_COLUMNS = ['Row','Input','Normalized Target','Status','Domain Rating','Checked At (UTC)','Ahrefs Target','Error'];
+  const DEFAULT_COLUMNS = ['Row','Input','Domain Rating'];
+  let visibleColumns = new Set(DEFAULT_COLUMNS);
+  let results = [];
+
+  const $ = id => document.getElementById(id);
+  const clean = value => {
+    let target = String(value || '').trim();
+    if (target.length >= 2 && target[0] === target[target.length - 1] && (target[0] === '"' || target[0] === "'")) target = target.slice(1, -1).trim();
+    if (!target || /\s/.test(target)) return '';
+    return target;
+  };
+  const keyOf = value => clean(value).toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+
+  if (LOCAL_PROXY) {
+    $('keyLabel').style.display = 'none';
+    $('key').style.display = 'none';
+    $('status').textContent = 'Local mode: using the saved key from ahrefs_local_key.txt.';
+  } else {
+    $('status').textContent = 'Static mode: use localhost mode for reliable live checks.';
+  }
+
+  function drawColumnChecks() {
+    $('columnChecks').innerHTML = ALL_COLUMNS.map(column => `<label><input type="checkbox" data-column="${escapeHtml(column)}" ${visibleColumns.has(column) ? 'checked' : ''}>${escapeHtml(column)}</label>`).join('');
+    $('columnChecks').querySelectorAll('input').forEach(input => input.addEventListener('change', () => {
+      if (input.checked) visibleColumns.add(input.dataset.column);
+      else visibleColumns.delete(input.dataset.column);
+      render();
+    }));
+  }
+
+  drawColumnChecks();
+  $('columnToggle').addEventListener('click', () => $('columnControls').classList.toggle('open'));
+  $('showDefault').addEventListener('click', () => { visibleColumns = new Set(DEFAULT_COLUMNS); drawColumnChecks(); render(); });
+  $('showAll').addEventListener('click', () => { visibleColumns = new Set(ALL_COLUMNS); drawColumnChecks(); render(); });
+  $('themeToggle').addEventListener('click', () => {
+    document.body.classList.toggle('light');
+    $('themeToggle').textContent = document.body.classList.contains('light') ? 'Switch to night mode' : 'Switch to light mode';
+  });
+
+  function parseText(text) {
+    return String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
+      const cells = line.split(/,|\t/);
+      return cells[0].replace(/^\s*["']|["']\s*$/g, '').trim();
+    });
+  }
+
+  $('file').addEventListener('change', async event => {
+    const file = event.target.files[0];
+    if (!file) return;
+    $('targets').value = parseText(await file.text()).join('\n');
+    $('status').textContent = `Loaded ${parseText($('targets').value).length} target(s) from ${file.name}.`;
+  });
+
+  async function requestBatch(targets, attempt = 0) {
+    const requestHeaders = { 'Accept': 'application/json', 'Content-Type': 'application/json' };
+    const requestBody = LOCAL_PROXY
+      ? { api_key: $('key').value.trim(), targets, version: $('version').value }
+      : { targets, version: $('version').value };
+    if (!LOCAL_PROXY) requestHeaders.Authorization = `Bearer ${$('key').value.trim()}`;
+    // In localhost mode, the Python server forwards the request to Ahrefs.
+    // In file/GitHub mode, this falls back to direct mode, which may be
+    // blocked by Ahrefs/browser CORS policy.
+    const response = await fetch(LOCAL_PROXY ? '/api/check' : ENDPOINT, {
+      method: 'POST',
+      headers: requestHeaders,
+      body: JSON.stringify(requestBody)
+    });
+    const text = await response.text();
+    let body = {};
+    try { body = JSON.parse(text || '{}'); } catch (_) {}
+    if (response.ok) {
+      if (body.ratings) return body.ratings;
+      const outer = body.domain_rating || body;
+      const map = {};
+      (outer.targets || []).forEach(item => {
+        const target = clean(item.target);
+        if (target) map[keyOf(target)] = { target, dr: item.domain_rating ?? '' };
+      });
+      return map;
+    }
+    let detail = body.error || body.message || text.slice(0, 300) || 'Unknown API error';
+    if (typeof detail !== 'string') detail = JSON.stringify(detail);
+    if (response.status === 429 && attempt < RETRY_DELAYS.length) {
+      $('status').textContent = `Rate limited; retrying in ${RETRY_DELAYS[attempt]} seconds…`;
+      await wait(RETRY_DELAYS[attempt]);
+      return requestBatch(targets, attempt + 1);
+    }
+    throw new Error(`HTTP ${response.status}: ${detail}`);
+  }
+
+  function render() {
+    if (!results.length) { $('table').innerHTML = '<div class="empty">No results yet.</div>'; $('download').disabled = true; return; }
+    const columns = ALL_COLUMNS.filter(column => visibleColumns.has(column));
+    if (!columns.length) { $('table').innerHTML = '<div class="empty">Choose at least one visible column.</div>'; $('download').disabled = false; return; }
+    $('table').innerHTML = `<table><thead><tr>${columns.map(col => `<th>${escapeHtml(col)}</th>`).join('')}</tr></thead><tbody>${results.map(row => `<tr>${columns.map(col => `<td>${escapeHtml(row[col])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    $('download').disabled = false;
+  }
+
+  $('run').addEventListener('click', async () => {
+    const apiKey = $('key').value.trim();
+    if (!apiKey && !LOCAL_PROXY) { $('status').textContent = 'Enter an Ahrefs API key first.'; return; }
+    const inputs = parseText($('targets').value);
+    if (!inputs.length) { $('status').textContent = 'Paste at least one domain or URL first.'; return; }
+    $('run').disabled = true; $('download').disabled = true; results = [];
+    const records = [], unique = [], seen = new Set();
+    inputs.forEach((input, index) => {
+      const target = clean(input); const key = keyOf(target);
+      const record = { Row: index + 1, Input: input, 'Normalized Target': target, Status: '', 'Domain Rating': '', 'Checked At (UTC)': '', 'Ahrefs Target': target, Error: '' };
+      if (!target) { record.Status = 'INVALID'; record.Error = 'Remove spaces and enter one domain or URL per row.'; }
+      else if (seen.has(key)) record.Status = 'DUPLICATE';
+      else { seen.add(key); unique.push({ key, target, record }); }
+      records.push(record);
+    });
+    try {
+      const checkedAt = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+      for (let offset = 0; offset < unique.length; offset += MAX_TARGETS) {
+        const chunk = unique.slice(offset, offset + MAX_TARGETS);
+        $('status').textContent = `Checking ${offset + 1}–${offset + chunk.length} of ${unique.length} unique target(s)…`;
+        let map;
+        try { map = await requestBatch(chunk.map(job => job.target)); }
+        catch (error) { chunk.forEach(job => { job.record.Status = String(error.message).includes('HTTP 429') ? 'RATE LIMITED' : 'ERROR'; job.record.Error = error.message; job.record['Checked At (UTC)'] = checkedAt; }); continue; }
+        chunk.forEach(job => {
+          const rating = map[job.key];
+          if (!rating) { job.record.Status = 'ERROR'; job.record.Error = 'Ahrefs returned no result for this target.'; }
+          else { job.record.Status = 'OK'; job.record['Domain Rating'] = rating.dr; job.record['Ahrefs Target'] = rating.target; }
+          job.record['Checked At (UTC)'] = checkedAt;
+        });
+      }
+      records.forEach(record => {
+        if (record.Status === 'DUPLICATE') {
+          const source = records.find(item => item !== record && item.Status !== 'DUPLICATE' && keyOf(item['Normalized Target']) === keyOf(record['Normalized Target']));
+          if (source) {
+            record['Domain Rating'] = source['Domain Rating'];
+            record['Ahrefs Target'] = source['Ahrefs Target'];
+            record['Checked At (UTC)'] = source['Checked At (UTC)'];
+            if (source.Status !== 'OK') { record.Status = source.Status; record.Error = source.Error; }
+          }
+        }
+      });
+      results = records;
+      render();
+      const counts = records.reduce((out, row) => { out[row.Status] = (out[row.Status] || 0) + 1; return out; }, {});
+      $('status').textContent = `Finished: ${Object.entries(counts).map(([key, value]) => `${key}=${value}`).join(', ')}.`;
+    } catch (error) { $('status').textContent = `Error: ${error.message}`; }
+    finally { $('run').disabled = false; }
+  });
+
+  $('download').addEventListener('click', () => {
+    const columns = ALL_COLUMNS;
+    const csv = [columns, ...results.map(row => columns.map(col => row[col]))].map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'ahrefs_dr_results.csv'; link.click(); URL.revokeObjectURL(url);
+  });
+  $('clear').addEventListener('click', () => { $('targets').value = ''; results = []; render(); $('status').textContent = 'Ready.'; });
+</script>
+</body>
+</html>
